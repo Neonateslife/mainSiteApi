@@ -1,11 +1,14 @@
-const express = require('express');
+
 const axios = require('axios');
 const bodyParser = require('body-parser');
 const cors = require('cors');
-const { v4: uuidv4 } = require('uuid');
-const app = express();
 const port = 3001; // Choose any port you prefer
 var base64 = require('base-64');
+const express = require('express');
+const { google } = require('googleapis');
+const { OAuth2 } = google.auth;
+const {v4 :uuidv4}=require('uuid')
+const app = express();
 
 app.use(bodyParser.json());
 app.use(cors( {
@@ -20,86 +23,6 @@ const momoPaymentStatusUrl = `https://${momoHost}/collection/v2_0/payment/`;
 let momoToken = null;
 var encodedData = base64.encode( "491bece6-0474-4e71-9209-ac54bb653edd:e4e3fcbceeee4f4a8bca9ac334e5ce25");
 console.log("the encoded is " + encodedData);
-// Endpoint to fetch MoMo token
-app.get('/', (req, res) => {
-		res.send('Hello World!');
-});
-
-app.post('/get-momo-token', async (req, res) => {
-		try {
-				const { apiKey, subscriptionKey } = req.body;
-				console.log(apiKey, subscriptionKey);
-
-				const momoTokenResponse = await axios.post(
-						momoTokenUrl,
-						{},
-						{
-								headers: {
-										'Content-Type': 'application/json',
-										'Ocp-Apim-Subscription-Key': subscriptionKey,
-										Authorization: `Basic ${encodedData}`,
-								},
-						}
-				);
-						console.log(momoTokenResponse.data);
-				momoToken = momoTokenResponse.data.access_token;
-
-				res.json({ momoToken });
-		} catch (error) {
-				console.error(error);
-				res.status(500).json({ error: 'An error occurred' });
-		}
-});
-
-// Endpoint to make a request to pay
-app.post('/request-to-pay', async (req, res) => {
-
-
-
-
-
-  try {
-
-    
-   
-    if (!momoToken) {
-      return res.status(400).json({ error: 'MoMo token not available' });
-    }
-
-    const { total, phone } = req.body;
-
-    const body = {
-      amount: total,
-      currency: 'UGX',
-      externalId: 'c8f060db-5126-47a7-a67b-2fee08c0f30d',
-      payer: {
-        partyIdType: phone,
-        partyId: 46733123454,
-      },
-      payerMessage: 'Payment for order',
-      payeeNote: 'Payment for order',
-    };
-
-    const momoResponse = await axios.post(
-      momoRequestToPayUrl,
-      body,
-      {
-        headers: {
-										'X-Reference-Id': 'c8f060db-5126-47a7-a67b-2fee077930c',
-										'X-Target-Environment': 'mtnuganda',
-										'Ocp-Apim-Subscription-Key':'13dfa4a0af1e48f0ab2114635c9319d9',
-										Authorization: `Bearer: ${momoToken}`,
-										'Content-Type': 'application/json',
-        },
-      }
-    );
-
-    res.json({ momoResponse: momoResponse.data });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'An error occurred' });
-  }
-});
 
 
 // Endpoint to fetch MoMo token and request payment
@@ -195,6 +118,73 @@ app.get('/payment-status/:referenceId', async (req, res) => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'An error occurred' });
+  }
+});
+const CLIENT_ID = '258347103096-i4rfpvh91lnodedd3vh2se9328un3emt.apps.googleusercontent.com'
+const CLIENT_SECRET = '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';
+const REDIRECT_URI = 'http://localhost:3000/redirect';
+const SCOPES = ['https://www.googleapis.com/auth/calendar.events'];
+
+const oAuth2Client = new OAuth2(CLIENT_ID, CLIENT_SECRET, REDIRECT_URI);
+
+
+// the enry point 
+app.get('/', (req, res) => {
+  const authUrl = oAuth2Client.generateAuthUrl({
+    access_type: 'offline',
+    scope: SCOPES,
+  });
+  res.send(`<a href="${authUrl}">Authorize with Google</a>`);
+});
+//  the redirect route to handle the concent
+app.get('/redirect', async (req, res) => {
+  const code = req.query.code;
+  console.log('Code:', code);
+  try {
+    const { tokens } = await oAuth2Client.getToken(code);
+    console.log('Access Token:', tokens);
+    oAuth2Client.setCredentials(tokens);
+
+    const calendar = google.calendar({ version: 'v3', auth: oAuth2Client });
+
+    // Create an event with a Meet link
+    const event = {
+      summary: 'My Important Meeting',
+      description: 'A chance to talk with important people.',
+      start: {
+        dateTime: '2024-06-03T10:00:00Z',
+        timeZone: 'America/Los_Angeles',
+      },
+      end: {
+        dateTime: '2024-06-03T10:30:00Z',
+        timeZone: 'America/Los_Angeles',
+      },
+      attendees: [
+        { email: 'kalungirasuli495@gmail.com' },
+        { email: 'kalungirasu@gmail.com' },
+      ],
+      conferenceData: {
+        createRequest: {
+          requestId: uuidv4(),
+          conferenceSolutionKey: {
+            type: 'hangoutsMeet'
+          }
+        }
+      }
+    };
+
+    const response = await calendar.events.insert({
+      calendarId: 'primary',
+      resource: event,
+      conferenceDataVersion: 1,
+    });
+
+    const meetUrl = response.data.hangoutLink;
+    // the meet link returned
+    res.send(`Meet URL: <a href="${meetUrl}">${meetUrl}</a>`);
+  } catch (error) {
+    console.error('Error retrieving access token', error);
+    res.status(500).send('Error during authentication');
   }
 });
 
