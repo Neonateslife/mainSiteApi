@@ -2,7 +2,7 @@
 const axios = require('axios');
 const bodyParser = require('body-parser');
 const cors = require('cors');
-const port = 3001; // Choose any port you prefer
+const port = 3000; // Choose any port you prefer
 var base64 = require('base-64');
 const express = require('express');
 const { google } = require('googleapis');
@@ -134,7 +134,7 @@ app.get('/', (req, res) => {
     access_type: 'offline',
     scope: SCOPES,
   });
-  res.send(`<a href="${authUrl}">Authorize with Google</a>`);
+  res.redirect(authUrl);
 });
 //  the redirect route to handle the concent
 app.get('/redirect', async (req, res) => {
