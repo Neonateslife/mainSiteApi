@@ -126,7 +126,11 @@ const REDIRECT_URI = 'http://localhost:3000/redirect';
 const SCOPES = ['https://www.googleapis.com/auth/calendar.events'];
 
 const oAuth2Client = new OAuth2(CLIENT_ID, CLIENT_SECRET, REDIRECT_URI);
-
+const UserId={
+  email:"",
+  id:"",
+  meeting:""
+}
 
 // the enry point 
 app.get('/', (req, res) => {
@@ -134,6 +138,9 @@ app.get('/', (req, res) => {
     access_type: 'offline',
     scope: SCOPES,
   });
+  const {email}= req.query
+  UserId.email=email
+
   res.redirect(authUrl);
 });
 //  the redirect route to handle the concent
@@ -181,7 +188,11 @@ app.get('/redirect', async (req, res) => {
 
     const meetUrl = response.data.hangoutLink;
     // the meet link returned
-    res.send(`Meet URL: <a href="${meetUrl}">${meetUrl}</a>`);
+    // res.send(`Meet URL: <a href="${meetUrl}">${meetUrl}</a>`);
+    UserId.meeting=meetUrl
+    UserId.id=uuidv4()
+    const sendData= await axios.post('http://localhost:5173/meet',UserId)
+    res.redirect('http://localhost:5173/')
   } catch (error) {
     console.error('Error retrieving access token', error);
     res.status(500).send('Error during authentication');
