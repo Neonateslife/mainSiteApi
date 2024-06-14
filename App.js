@@ -37,7 +37,7 @@ app.post('/pay', async (req, res) => {
       {
         headers: {
           'Content-Type': 'application/json',
-          'Ocp-Apim-Subscription-Key':'04a79371a8834513a4031e5f4bf0778f',
+          'Ocp-Apim-Subscription-Key': '04a79371a8834513a4031e5f4bf0778f',
           Authorization: `Basic ${encodedData}`,
         },
       }
@@ -47,7 +47,6 @@ app.post('/pay', async (req, res) => {
 
     // Step 2: Make request to pay
     const referenceId = uuidv4();
-    console.log(referenceId);
     const body = {
       amount: total,
       currency: 'UGX',
@@ -65,7 +64,7 @@ app.post('/pay', async (req, res) => {
       body,
       {
         headers: {
-          'X-Reference-Id': referenceId ,
+          'X-Reference-Id': referenceId,
           'X-Target-Environment': 'mtnuganda',
           'Ocp-Apim-Subscription-Key': '04a79371a8834513a4031e5f4bf0778f',
           Authorization: `Bearer ${momoToken}`,
@@ -74,7 +73,43 @@ app.post('/pay', async (req, res) => {
       }
     );
 
-    res.json({ momoResponse: momoResponse.data });
+    // Step 3: Regenerate MoMo token
+    setTimeout(async () => {
+      try {
+        const newTokenResponse = await axios.post(
+          momoTokenUrl,
+          {},
+          {
+            headers: {
+              'Content-Type': 'application/json',
+              'Ocp-Apim-Subscription-Key': '04a79371a8834513a4031e5f4bf0778f',
+              Authorization: `Basic ${encodedData}`,
+            },
+          }
+        );
+
+        const newMomoToken = newTokenResponse.data.access_token;
+
+        // Step 4: Get payment status
+        const paymentStatusResponse = await axios.get(
+          `${momoPaymentStatusUrl}${referenceId}`,
+          {
+            headers: {
+              'X-Target-Environment': 'mtnuganda',
+              'Ocp-Apim-Subscription-Key': '04a79371a8834513a4031e5f4bf0778f',
+              Authorization: `Bearer ${newMomoToken}`,
+              'Content-Type': 'application/json',
+            },
+          }
+        );
+
+        res.json({ momoResponse: momoResponse.data, paymentStatus: paymentStatusResponse.data });
+      } catch (statusError) {
+        console.error(statusError);
+        res.status(500).json({ error: 'An error occurred while fetching payment status' });
+      }
+    }, 30000); 
+
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'An error occurred' });
