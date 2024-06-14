@@ -223,11 +223,7 @@ app.get('/redirect', async (req, res) => {
 
     const meetUrl = response.data.hangoutLink;
     // the meet link returned
-    // res.send(`Meet URL: <a href="${meetUrl}">${meetUrl}</a>`);
-    UserId.meeting=meetUrl
-    UserId.id=uuidv4()
-    const sendData= await axios.post('http://localhost:5173/meet',UserId)
-    res.redirect('http://localhost:5173/')
+    res.send(`Meet URL: <a href="${meetUrl}">${meetUrl}</a>`);
   } catch (error) {
     console.error('Error retrieving access token', error);
     res.status(500).send('Error during authentication');
