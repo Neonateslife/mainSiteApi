@@ -9,7 +9,29 @@ const { google } = require('googleapis');
 const { OAuth2 } = google.auth;
 const {v4 :uuidv4}=require('uuid')
 const app = express();
+const admin = require('firebase-admin');
+require('dotenv').config();
 
+const serviceAccount = {
+  type: process.env.FIREBASE_TYPE,
+  project_id: process.env.FIREBASE_PROJECT_ID,
+  private_key_id: process.env.FIREBASE_PRIVATE_KEY_ID,
+  private_key: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'), // Replace escaped newline characters
+  client_email: process.env.FIREBASE_CLIENT_EMAIL,
+  client_id: process.env.FIREBASE_CLIENT_ID,
+  auth_uri: process.env.FIREBASE_AUTH_URI,
+  token_uri: process.env.FIREBASE_TOKEN_URI,
+  auth_provider_x509_cert_url: process.env.FIREBASE_AUTH_PROVIDER_CERT_URL,
+  client_x509_cert_url: process.env.FIREBASE_CLIENT_CERT_URL,
+  universe_domain: process.env.FIREBASE_UNIVERSE_DOMAIN
+};
+
+
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount)
+});
+
+const db = admin.firestore(); 
 app.use(bodyParser.json());
 app.use(cors( {
   allowedHeaders:"*"
@@ -58,6 +80,7 @@ app.post('/pay', async (req, res) => {
       payerMessage: 'Payment for order',
       payeeNote: 'Payment for order',
     };
+    
 
     const momoResponse = await axios.post(
       momoRequestToPayUrl,
@@ -162,9 +185,10 @@ const SCOPES = ['https://www.googleapis.com/auth/calendar.events'];
 
 const oAuth2Client = new OAuth2(CLIENT_ID, CLIENT_SECRET, REDIRECT_URI);
 const UserId={
-  email:"",
-  id:"",
-  meeting:""
+  userId:'',
+  doctorId:'',
+  meetingLink:'',
+  id:''
 }
 
 // the enry point 
@@ -223,7 +247,32 @@ app.get('/redirect', async (req, res) => {
 
     const meetUrl = response.data.hangoutLink;
     // the meet link returned
-    res.send(`Meet URL: <a href="${meetUrl}">${meetUrl}</a>`);
+    // res.send(`Meet URL: <a href="${meetUrl}">${meetUrl}</a>`);
+    UserId.meeting=meetUrl
+    UserId.id=uuidv4()
+    const isInitialized = admin.apps.length > 0;
+
+    if (isInitialized) {
+      const { userId, doctorId, meetingLink,id } = UserId;
+
+    if (!userId || !doctorId || !meetingLink||!id ) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    const timestamp = admin.firestore.Timestamp.now();
+
+    await db.collection('appointments').add({
+      userId,
+      doctorId,
+      meetingLink,
+      id,
+    });
+      
+    } else {
+      res.status(500).render('./404.html');
+      return;
+    }
+    res.redirect('http://localhost:5173/sign-in')
   } catch (error) {
     console.error('Error retrieving access token', error);
     res.status(500).send('Error during authentication');
@@ -232,6 +281,26 @@ app.get('/redirect', async (req, res) => {
 
 
 
+
+// Endpoint to check Firebase initialization status
+app.get('/firebase-status', async(req, res) => {
+  try {
+    // Check if Firebase Admin app has been initialized
+    
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'An error occurred' });
+  }
+});
+app.post('/save-data', async (req, res) => {
+  try {
+    
+    res.status(201).json({ message: 'Data saved successfully' });
+  } catch (error) {
+    console.error('Error saving data:', error);
+    res.status(500).json({ error: 'Failed to save data' });
+  }
+});
 app.listen(port, () => {
   console.log(`Server listening at http://localhost:${port}`);
 });
