@@ -201,8 +201,8 @@ app.get('/', (req, res) => {
   //this the id picked from the id from the frontend use this id
   const {bookingId } = req.query;
   console.log("the bookig id from server is ",bookingId)
-  UserId.email = email;
-  UserId.bookingId = bookingId; // Include booking ID
+  // UserId.email = email;
+  UserId.bookingId = bookingId; 
 
   res.redirect(authUrl);
 });
