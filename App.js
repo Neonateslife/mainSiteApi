@@ -189,7 +189,8 @@ const UserId = {
   userId: '',
   doctorId: '',
   meetingLink: '',
-  id: ''
+  id: '',
+  bookingId:''
 }
 
 // the enry point 
@@ -203,13 +204,13 @@ app.get('/', (req, res) => {
   console.log("the bookig id from server is ",bookingId)
   // UserId.email = email;
   UserId.bookingId = bookingId; 
-
+console.log("the user is ", UserId.bookingId)
   res.redirect(authUrl);
 });
 //  the redirect route to handle the concent
 app.get('/redirect', async (req, res) => {
   const code = req.query.code;
-  console.log('Code:', code);
+  console.log('Code:', UserId);
   try {
     const { tokens } = await oAuth2Client.getToken(code);
     console.log('Access Token:', tokens);
