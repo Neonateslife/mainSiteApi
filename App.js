@@ -7,7 +7,7 @@ var base64 = require('base-64');
 const express = require('express');
 const { google } = require('googleapis');
 const { OAuth2 } = google.auth;
-const {v4 :uuidv4}=require('uuid')
+const { v4: uuidv4 } = require('uuid')
 const app = express();
 const admin = require('firebase-admin');
 require('dotenv').config();
@@ -31,10 +31,10 @@ admin.initializeApp({
   credential: admin.credential.cert(serviceAccount)
 });
 
-const db = admin.firestore(); 
+const db = admin.firestore();
 app.use(bodyParser.json());
-app.use(cors( {
-  allowedHeaders:"*"
+app.use(cors({
+  allowedHeaders: "*"
 })); // Enable CORS for all routes
 
 const momoHost = 'proxy.momoapi.mtn.com';
@@ -43,15 +43,16 @@ const momoRequestToPayUrl = `https://${momoHost}/collection/v1_0/requesttopay`;
 
 const momoPaymentStatusUrl = `https://${momoHost}/collection/v2_0/payment/`;
 let momoToken = null;
-var encodedData = base64.encode( "491bece6-0474-4e71-9209-ac54bb653edd:e4e3fcbceeee4f4a8bca9ac334e5ce25");
+var encodedData = base64.encode("491bece6-0474-4e71-9209-ac54bb653edd:e4e3fcbceeee4f4a8bca9ac334e5ce25");
 console.log("the encoded is " + encodedData);
 
 
 // Endpoint to fetch MoMo token and request payment
 app.post('/pay', async (req, res) => {
   try {
-    const { total, phone } = req.body;
-
+    const { total, phone,bookingId } = req.body;
+    // const {bookingId } = req.query;
+    console.log("the booking id is", bookingId)
     // Step 1: Get MoMo token
     const tokenResponse = await axios.post(
       momoTokenUrl,
@@ -80,7 +81,7 @@ app.post('/pay', async (req, res) => {
       payerMessage: 'Payment for order',
       payeeNote: 'Payment for order',
     };
-    
+
 
     const momoResponse = await axios.post(
       momoRequestToPayUrl,
@@ -131,7 +132,7 @@ app.post('/pay', async (req, res) => {
         console.error(statusError);
         res.status(500).json({ error: 'An error occurred while fetching payment status' });
       }
-    }, 30000); 
+    }, 30000);
 
   } catch (error) {
     console.error(error);
@@ -184,11 +185,11 @@ const REDIRECT_URI = 'http://localhost:3000/redirect';
 const SCOPES = ['https://www.googleapis.com/auth/calendar.events'];
 
 const oAuth2Client = new OAuth2(CLIENT_ID, CLIENT_SECRET, REDIRECT_URI);
-const UserId={
-  userId:'',
-  doctorId:'',
-  meetingLink:'',
-  id:''
+const UserId = {
+  userId: '',
+  doctorId: '',
+  meetingLink: '',
+  id: ''
 }
 
 // the enry point 
@@ -197,8 +198,11 @@ app.get('/', (req, res) => {
     access_type: 'offline',
     scope: SCOPES,
   });
-  const {email}= req.query
-  UserId.email=email
+  //this the id picked from the id from the frontend use this id
+  const {bookingId } = req.query;
+  console.log("the bookig id from server is ",bookingId)
+  UserId.email = email;
+  UserId.bookingId = bookingId; // Include booking ID
 
   res.redirect(authUrl);
 });
@@ -213,7 +217,6 @@ app.get('/redirect', async (req, res) => {
 
     const calendar = google.calendar({ version: 'v3', auth: oAuth2Client });
 
-    // Create an event with a Meet link
     const event = {
       summary: 'My Important Meeting',
       description: 'A chance to talk with important people.',
@@ -246,28 +249,31 @@ app.get('/redirect', async (req, res) => {
     });
 
     const meetUrl = response.data.hangoutLink;
-    // the meet link returned
-    // res.send(`Meet URL: <a href="${meetUrl}">${meetUrl}</a>`);
-    UserId.meeting=meetUrl
-    UserId.id=uuidv4()
+    console.log('Meeting URL:', meetUrl);
+
+    UserId.meeting = meetUrl;
+    UserId.id = uuidv4();
     const isInitialized = admin.apps.length > 0;
 
     if (isInitialized) {
-      const { userId, doctorId, meetingLink,id } = UserId;
+      const { meeting, id, bookingId } = UserId;
+      console.log('Meeting:', meeting);
+      console.log('ID:', id);
+      console.log('Booking ID:', bookingId);
 
-    if (!userId || !doctorId || !meetingLink||!id ) {
-      return res.status(400).json({ error: 'Missing required fields' });
-    }
+      // if (!userId || !doctorId || !meetingLink || !id || !bookingId) {
+      //   return res.status(400).json({ error: 'Missing required fields' });
+      // }
 
-    const timestamp = admin.firestore.Timestamp.now();
+      const timestamp = admin.firestore.Timestamp.now();
 
-    await db.collection('appointments').add({
-      userId,
-      doctorId,
-      meetingLink,
-      id,
-    });
-      
+      // Update the booking with the Hangout link
+      const bookingRef = db.collection('bookings').doc(bookingId);
+      await bookingRef.update({
+        meetingLink: meetUrl,
+      });
+      console.log('Booking updated successfully.');
+
     } else {
       res.status(500).render('./404.html');
       return;
@@ -283,10 +289,10 @@ app.get('/redirect', async (req, res) => {
 
 
 // Endpoint to check Firebase initialization status
-app.get('/firebase-status', async(req, res) => {
+app.get('/firebase-status', async (req, res) => {
   try {
     // Check if Firebase Admin app has been initialized
-    
+
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'An error occurred' });
@@ -294,7 +300,7 @@ app.get('/firebase-status', async(req, res) => {
 });
 app.post('/save-data', async (req, res) => {
   try {
-    
+
     res.status(201).json({ message: 'Data saved successfully' });
   } catch (error) {
     console.error('Error saving data:', error);
