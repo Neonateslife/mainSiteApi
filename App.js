@@ -46,7 +46,6 @@ let momoToken = null;
 var encodedData = base64.encode("491bece6-0474-4e71-9209-ac54bb653edd:e4e3fcbceeee4f4a8bca9ac334e5ce25");
 console.log("the encoded is " + encodedData);
 
-
 // Endpoint to fetch MoMo token and request payment
 app.post('/pay', async (req, res) => {
   try {
@@ -96,7 +95,7 @@ app.post('/pay', async (req, res) => {
         },
       }
     );
-
+    let times=0
     // Step 3: Regenerate MoMo token
     setTimeout(async () => {
       try {
@@ -126,8 +125,30 @@ app.post('/pay', async (req, res) => {
             },
           }
         );
+        if(paymentStatusResponse.data.status == 'SUCCESSFUL'){
+          return res.json({ momoResponse: momoResponse.data, paymentStatus: paymentStatusResponse.data });
+        }else if(paymentStatusResponse.data.status == 'PENDING'){
+          res.json({ momoResponse: momoResponse.data, paymentStatus: paymentStatusResponse.data });
+        } else{
+          // this call the payment process again
+          if(times>2){
+            times++
+            const tokenResponse = await axios.post(
+              momoTokenUrl,
+              {},
+              {
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Ocp-Apim-Subscription-Key': '04a79371a8834513a4031e5f4bf0778f',
+                  Authorization: `Basic ${encodedData}`,
+                },
+              }
+            );
+          }else{
+          return res.json({ momoResponse: momoResponse.data, paymentStatus: paymentStatusResponse.data })
+          }
 
-        res.json({ momoResponse: momoResponse.data, paymentStatus: paymentStatusResponse.data });
+        }
       } catch (statusError) {
         console.error(statusError);
         res.status(500).json({ error: 'An error occurred while fetching payment status' });
