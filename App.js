@@ -10,6 +10,7 @@ const { OAuth2 } = google.auth;
 const { v4: uuidv4 } = require('uuid')
 const app = express();
 const admin = require('firebase-admin');
+const path=require('path')
 require('dotenv').config();
 
 const serviceAccount = {
@@ -300,35 +301,21 @@ app.get('/redirect', async (req, res) => {
       res.status(500).render('./404.html');
       return;
     }
-    res.redirect('http://localhost:5173/sign-in')
+    res.redirect('https://paedlyfe.org/appointment')
   } catch (error) {
     console.error('Error retrieving access token', error);
-    res.status(500).send('Error during authentication');
+    res.status(500).sendFile(path.join(__dirname,'.404.html'))
   }
 });
 
+app.get('/policy',async(req,res)=>{
+  res.sendFile(path.join(__dirname,'./Privacy.html'))
+})
+app.get('/terms',async(req,res)=>{
+  res.sendFile(path.join(__dirname,'./term.html'))
+})
 
 
-
-// Endpoint to check Firebase initialization status
-app.get('/firebase-status', async (req, res) => {
-  try {
-    // Check if Firebase Admin app has been initialized
-
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'An error occurred' });
-  }
-});
-app.post('/save-data', async (req, res) => {
-  try {
-
-    res.status(201).json({ message: 'Data saved successfully' });
-  } catch (error) {
-    console.error('Error saving data:', error);
-    res.status(500).json({ error: 'Failed to save data' });
-  }
-});
 app.listen(port, () => {
   console.log(`Server listening at http://localhost:${port}`);
 });
