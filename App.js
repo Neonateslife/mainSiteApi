@@ -96,9 +96,12 @@ app.post('/pay', async (req, res) => {
         },
       }
     );
-    let times=0
-    // Step 3: Regenerate MoMo token
-    setTimeout(async () => {
+
+    // the listening while loop
+    let status=null //the respose status init to null/empty
+    while(status != 'SUCCESSFUL' || status != 'FAILED'){
+
+       // Step 3: Regenerate MoMo token
       try {
         const newTokenResponse = await axios.post(
           momoTokenUrl,
@@ -113,8 +116,9 @@ app.post('/pay', async (req, res) => {
         );
 
         const newMomoToken = newTokenResponse.data.access_token;
-
+      
         // Step 4: Get payment status
+        
         const paymentStatusResponse = await axios.get(
           `${momoPaymentStatusUrl}${referenceId}`,
           {
@@ -126,35 +130,26 @@ app.post('/pay', async (req, res) => {
             },
           }
         );
+        
         if(paymentStatusResponse.data.status == 'SUCCESSFUL'){
-          return res.json({ momoResponse: momoResponse.data, paymentStatus: paymentStatusResponse.data });
-        }else if(paymentStatusResponse.data.status == 'PENDING'){
-          res.json({ momoResponse: momoResponse.data, paymentStatus: paymentStatusResponse.data });
-        } else{
-          // this call the payment process again
-          if(times>2){
-            times++
-            const tokenResponse = await axios.post(
-              momoTokenUrl,
-              {},
-              {
-                headers: {
-                  'Content-Type': 'application/json',
-                  'Ocp-Apim-Subscription-Key': '04a79371a8834513a4031e5f4bf0778f',
-                  Authorization: `Basic ${encodedData}`,
-                },
-              }
-            );
-          }else{
-          return res.json({ momoResponse: momoResponse.data, paymentStatus: paymentStatusResponse.data })
-          }
+          status = 'SUCCESSFUL'
+          return res.json({ momoResponse: momoResponse.data, paymentStatus: paymentStatusResponse.data.status });
 
+        }else if(paymentStatusResponse.data.status == 'FAILED'){
+          status = 'FAILED'
+          return res.json({ momoResponse: momoResponse.data, paymentStatus: paymentStatusResponse.data.status });
+        }else{
+          status = null 
         }
       } catch (statusError) {
         console.error(statusError);
         res.status(500).json({ error: 'An error occurred while fetching payment status' });
       }
-    }, 30000);
+    
+    }
+   
+    
+   
 
   } catch (error) {
     console.error(error);
@@ -222,8 +217,9 @@ app.get('/', (req, res) => {
     scope: SCOPES,
   });
   //this the id picked from the id from the frontend use this id
+  if(!req.query){return res.status(400).render('./404.html')}
   const {bookingId } = req.query;
-  console.log("the bookig id from server is ",bookingId)
+  // console.log("the bookig id from server is ",bookingId)
   // UserId.email = email;
   UserId.bookingId = bookingId; 
 console.log("the user is ", UserId.bookingId)
@@ -316,6 +312,6 @@ app.get('/terms',async(req,res)=>{
 })
 
 
-app.listen(port, () => {
+app.listen(process.env.PORT||port, () => {
   console.log(`Server listening at http://localhost:${port}`);
 });
